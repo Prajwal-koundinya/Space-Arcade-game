@@ -1,0 +1,444 @@
+<!-- This Simple Game is developed by Prajwal Koundinya -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceship Arcade Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            z-index: 2;
+        }
+
+        #ui span {
+            margin-right: 20px;
+        }
+
+        #popup, #gameOverPopup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+        }
+
+        #popup h1, #gameOverPopup h1 {
+            margin-bottom: 20px;
+        }
+
+        #popup ul, #gameOverPopup ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+
+        #popup ul li, #gameOverPopup ul li {
+            margin: 10px 0;
+        }
+
+        #startButton, #restartButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #startButton:hover, #restartButton:hover {
+            background-color: #0056b3;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="popup">
+        <h1>Welcome to Spaceship Arcade Game</h1>
+        <ul>
+            <li><strong>Arrow Left</strong>: Rotate left</li>
+            <li><strong>Arrow Right</strong>: Rotate right</li>
+            <li><strong>Arrow Up</strong>: Thrust forward</li>
+            <li><strong>Arrow Down</strong>: Thrust backward</li>
+            <li><strong>Space</strong>: Shoot laser</li>
+            <li><strong>Enter</strong>: Hyperspace teleport</li>
+        </ul>
+        <button id="startButton">Start Game 🚀</button>
+    </div>
+
+    <div id="gameOverPopup" style="display: none;">
+        <h1>Game Over</h1>
+        <button id="restartButton">Restart</button>
+    </div>
+
+    <div id="ui">
+        <span id="score">Score: 0</span>
+        <span id="lives">Lives: 3</span>
+        <span id="cooldown">Laser Ready</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const uiScore = document.getElementById('score');
+        const uiLives = document.getElementById('lives');
+        const uiCooldown = document.getElementById('cooldown');
+        const popup = document.getElementById('popup');
+        const startButton = document.getElementById('startButton');
+        const gameOverPopup = document.getElementById('gameOverPopup');
+        const restartButton = document.getElementById('restartButton');
+
+        let score = 0;
+        let lives = 3;
+        let laserCooldown = false;
+        let hyperspaceAvailable = true;
+        let asteroidsDestroyed = 0;
+        let initialAsteroidSpeed = 2;
+        let initialSpaceshipSpeed = 5;
+        let asteroidSpeed = initialAsteroidSpeed;
+        let spaceshipMaxSpeed = initialSpaceshipSpeed;
+        let startTime;
+
+        const spaceship = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 20,
+            angle: 0,
+            speed: 0,
+            maxSpeed: spaceshipMaxSpeed,
+            thrust: false,
+            lasers: [],
+        };
+
+        const asteroids = [];
+        let fragments = [];
+
+        const controls = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+        };
+
+        function createAsteroid() {
+            const size = Math.random() * 30 + 20;
+            const speed = Math.random() * asteroidSpeed + 1;
+            const angle = Math.random() * Math.PI * 2;
+            const x = Math.random() < 0.5 ? 0 : canvas.width;
+            const y = Math.random() < 0.5 ? 0 : canvas.height;
+
+            asteroids.push({ x, y, size, speed, angle });
+        }
+
+        function increaseDifficulty() {
+            const elapsedTime = (Date.now() - startTime) / 1000;
+            if (elapsedTime > 420) {
+                asteroidSpeed = initialAsteroidSpeed + 1.5;
+                spaceshipMaxSpeed = initialSpaceshipSpeed + 1.5;
+            } else if (elapsedTime > 240) {
+                asteroidSpeed = initialAsteroidSpeed + 1.2;
+                spaceshipMaxSpeed = initialSpaceshipSpeed + 1.2;
+            } else if (elapsedTime > 60) {
+                asteroidSpeed = initialAsteroidSpeed + 0.8;
+                spaceshipMaxSpeed = initialSpaceshipSpeed + 0.8;
+            }
+            spaceship.maxSpeed = spaceshipMaxSpeed;
+        }
+
+        function resetDifficulty() {
+            asteroidSpeed = initialAsteroidSpeed;
+            spaceshipMaxSpeed = initialSpaceshipSpeed;
+            spaceship.maxSpeed = spaceshipMaxSpeed;
+        }
+
+        function drawSpaceship() {
+            ctx.save();
+            ctx.translate(spaceship.x, spaceship.y);
+            ctx.rotate(spaceship.angle);
+            
+            ctx.beginPath();
+            ctx.moveTo(0, -spaceship.size);
+            ctx.lineTo(spaceship.size, spaceship.size / 2);
+            ctx.lineTo(0, spaceship.size);
+            ctx.lineTo(-spaceship.size, spaceship.size / 2);
+            ctx.closePath();
+            ctx.fillStyle = 'white';
+            ctx.fill();
+
+            if (spaceship.thrust) {
+                ctx.beginPath();
+                ctx.moveTo(-spaceship.size / 2, spaceship.size / 2);
+                ctx.lineTo(0, spaceship.size + Math.random() * 10);
+                ctx.lineTo(spaceship.size / 2, spaceship.size / 2);
+                ctx.fillStyle = 'orange';
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawAsteroids() {
+            asteroids.forEach(asteroid => {
+                ctx.save();
+                ctx.translate(asteroid.x, asteroid.y);
+                ctx.rotate(asteroid.angle);
+
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const x = Math.cos(angle) * asteroid.size;
+                    const y = Math.sin(angle) * asteroid.size;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                ctx.strokeStyle = 'gray';
+                ctx.stroke();
+
+                ctx.restore();
+            });
+        }
+
+        function drawFragments() {
+            fragments.forEach(fragment => {
+                ctx.beginPath();
+                ctx.arc(fragment.x, fragment.y, fragment.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'orange';
+                ctx.fill();
+            });
+        }
+
+        function drawLasers() {
+            spaceship.lasers.forEach(laser => {
+                ctx.beginPath();
+                ctx.arc(laser.x, laser.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            });
+        }
+
+        function updateSpaceship() {
+            if (controls.left) spaceship.angle -= 0.05;
+            if (controls.right) spaceship.angle += 0.05;
+            
+            if (controls.up) {
+                spaceship.thrust = true;
+                spaceship.speed = Math.min(spaceship.speed + 0.1, spaceship.maxSpeed);
+            } else if (controls.down) {
+                spaceship.thrust = true;
+                spaceship.speed = Math.max(spaceship.speed - 0.1, -spaceship.maxSpeed);
+            } else {
+                spaceship.thrust = false;
+                spaceship.speed = Math.max(spaceship.speed - 0.05, 0);
+            }
+
+            spaceship.x += Math.cos(spaceship.angle) * spaceship.speed;
+            spaceship.y += Math.sin(spaceship.angle) * spaceship.speed;
+
+            if (spaceship.x < 0) spaceship.x = canvas.width;
+            if (spaceship.x > canvas.width) spaceship.x = 0;
+            if (spaceship.y < 0) spaceship.y = canvas.height;
+            if (spaceship.y > canvas.height) spaceship.y = 0;
+        }
+
+        function updateAsteroids() {
+            asteroids.forEach(asteroid => {
+                asteroid.x += Math.cos(asteroid.angle) * asteroid.speed;
+                asteroid.y += Math.sin(asteroid.angle) * asteroid.speed;
+
+                if (asteroid.x < 0) asteroid.x = canvas.width;
+                if (asteroid.x > canvas.width) asteroid.x = 0;
+                if (asteroid.y < 0) asteroid.y = canvas.height;
+                if (asteroid.y > canvas.height) asteroid.y = 0;
+            });
+        }
+
+        function updateFragments() {
+            fragments.forEach(fragment => {
+                fragment.x += fragment.vx;
+                fragment.y += fragment.vy;
+                fragment.lifetime--;
+            });
+
+            fragments = fragments.filter(fragment => fragment.lifetime > 0);
+        }
+
+        function updateLasers() {
+            spaceship.lasers = spaceship.lasers.filter(laser => {
+                laser.x += Math.cos(laser.angle) * 10;
+                laser.y += Math.sin(laser.angle) * 10;
+                return laser.x > 0 && laser.x < canvas.width && laser.y > 0 && laser.y < canvas.height;
+            });
+        }
+
+        function checkCollisions() {
+            asteroids.forEach((asteroid, aIdx) => {
+                const dx = spaceship.x - asteroid.x;
+                const dy = spaceship.y - asteroid.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < asteroid.size + spaceship.size) {
+                    lives -= 1;
+                    asteroids.splice(aIdx, 1);
+                }
+
+                spaceship.lasers.forEach((laser, lIdx) => {
+                    const dx = laser.x - asteroid.x;
+                    const dy = laser.y - asteroid.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < asteroid.size) {
+                        score += Math.round(asteroid.size);
+                        asteroidsDestroyed++;
+                        spaceship.lasers.splice(lIdx, 1);
+                        asteroids.splice(aIdx, 1);
+
+                        for (let i = 0; i < 4; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const speed = Math.random() * 2 + 1;
+                            fragments.push({
+                                x: asteroid.x,
+                                y: asteroid.y,
+                                size: asteroid.size / 4,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                lifetime: 50,
+                            });
+                        }
+
+                        if (asteroidsDestroyed % 10 === 0) {
+                            lives++;
+                        }
+
+                        createAsteroid();
+                    }
+                });
+            });
+        }
+
+        function teleportSpaceship() {
+            if (hyperspaceAvailable) {
+                spaceship.x = Math.random() * canvas.width;
+                spaceship.y = Math.random() * canvas.height;
+                hyperspaceAvailable = false;
+
+                setTimeout(() => {
+                    hyperspaceAvailable = true;
+                }, 5000);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawSpaceship();
+            drawAsteroids();
+            drawFragments();
+            drawLasers();
+        }
+
+        function update() {
+            updateSpaceship();
+            updateAsteroids();
+            updateFragments();
+            updateLasers();
+            checkCollisions();
+            increaseDifficulty();
+            uiScore.textContent = `Score: ${score}`;
+            uiLives.textContent = `Lives: ${lives}`;
+
+            if (lives <= 0) {
+                gameOverPopup.style.display = 'flex';
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft') controls.left = true;
+            if (e.code === 'ArrowRight') controls.right = true;
+            if (e.code === 'ArrowUp') controls.up = true;
+            if (e.code === 'ArrowDown') controls.down = true;
+            if (e.code === 'Space' && !laserCooldown) {
+                spaceship.lasers.push({ x: spaceship.x, y: spaceship.y, angle: spaceship.angle });
+                laserCooldown = true;
+                uiCooldown.textContent = 'Laser Recharging...';
+                setTimeout(() => {
+                    laserCooldown = false;
+                    uiCooldown.textContent = 'Laser Ready';
+                }, 500);
+            }
+            if (e.code === 'Enter') {
+                teleportSpaceship();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowLeft') controls.left = false;
+            if (e.code === 'ArrowRight') controls.right = false;
+            if (e.code === 'ArrowUp') controls.up = false;
+            if (e.code === 'ArrowDown') controls.down = false;
+        });
+
+        startButton.addEventListener('click', () => {
+            popup.style.display = 'none';
+            startTime = Date.now();
+            for (let i = 0; i < 5; i++) createAsteroid();
+            loop();
+        });
+
+        restartButton.addEventListener('click', () => {
+            gameOverPopup.style.display = 'none';
+            score = 0;
+            lives = 3;
+            asteroidsDestroyed = 0;
+            asteroids.length = 0;
+            fragments.length = 0;
+            resetDifficulty();
+            startTime = Date.now();
+            for (let i = 0; i < 5; i++) createAsteroid();
+            loop();
+        });
+    </script>
+</body>
+</html>
