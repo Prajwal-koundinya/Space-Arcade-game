@@ -22,7 +22,6 @@ Key highlights include:
 - **Asteroids**: Realistic-looking asteroids with rotation animations and fragmenting upon destruction.
 - **Lasers**: Bright and animated laser beams for a futuristic feel.
 
-![Game Preview Placeholder](https://via.placeholder.com/800x400.png?text=Game+Preview+Image+Here)
 
 ---
 
