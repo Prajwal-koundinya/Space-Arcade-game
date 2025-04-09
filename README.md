@@ -20,7 +20,7 @@ Key highlights include:
 - **Background**: A stunning starfield with parallax scrolling for a sense of depth.
 - **Spaceship**: A sleek, animated design with visual effects for thrust and teleportation.
 - **Asteroids**: Realistic-looking asteroids with rotation animations and fragmenting upon destruction.
-- **Lasers**: Bright and animated laser beams for a futuristic feel.
+- **Lasers**: Animated laser beams for a futuristic feel.
 
 
 ---
