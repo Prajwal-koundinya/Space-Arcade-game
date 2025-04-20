@@ -1,6 +1,6 @@
 # 🚀 Spaceship Arcade Game
 
-Welcome to the **Spaceship Arcade Game**, a retro-styled adventure where you pilot a spaceship through an asteroid field, avoiding collisions while blasting your way to a high score! This game combines exciting visuals with engaging gameplay mechanics.
+Welcome to the **Spaceship Arcade Game**, a retro-styled adventure where you pilot a spaceship through an asteroid field, avoiding collisions while blasting your way.
 
 ---
 
